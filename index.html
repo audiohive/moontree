@@ -335,18 +335,15 @@
         <h3 class="text-lg font-medium text-white">Sync to Personal Calendar</h3>
       </div>
       <p class="text-sm text-slate-400 mb-4 leading-relaxed">
-        To sync these global events to your personal schedule, enter your Google OAuth Client ID. Events will be
+        To sync these global events to your personal schedule, authorize access to your Google Calendar. Events will be
         automatically saved to a dedicated <strong>"moontree"</strong> calendar in your account.
       </p>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Google Client ID</label>
-          <input type="text" id="gcal-client-id"
-            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500 transition-colors font-mono text-sm"
-            placeholder="XXXX-XXXX.apps.googleusercontent.com">
-          <p id="gcal-error" class="text-xs text-red-400 mt-2 hidden"></p>
-        </div>
-      </div>
+
+      <!-- Hidden Input Field for Client ID -->
+      <input type="hidden" id="gcal-client-id"
+        value="974411235419-npi8k80m1hp7ccvp30bbm1lspabrrjj9.apps.googleusercontent.com">
+      <p id="gcal-error" class="text-xs text-red-400 mt-2 hidden"></p>
+
       <div class="flex justify-end gap-3 mt-6">
         <button onclick="closeModals()"
           class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Close</button>
