@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Celtic Lunar Calendar - Community Edition</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Identity Services for Calendar Sync -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- Custom CSS for Animations & Safari Fixes -->
+  <style>
+    html,
+    body {
+      overflow-x: hidden;
+      width: 100%;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    @keyframes pulse-slow {
+
+      0%,
+      100% {
+        opacity: 0.2;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    /* Custom Scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(59, 130, 246, 0.5);
+      border-radius: 4px;
+    }
+
+    /* Admin Toggle Classes */
+    .hidden-until-admin {
+      display: none !important;
+    }
+
+    .admin-mode .hidden-until-admin {
+      display: flex !important;
+    }
+
+    .admin-mode .hidden-when-admin {
+      display: none !important;
+    }
+
+    /* Safari Specific Fixes */
+    .safari-backdrop-blur {
+      -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(24px);
+      background-color: rgba(15, 23, 42, 0.4);
+    }
+
+    .safari-clip-fix {
+      /* Prevents Safari bug where overflow visible ignores border radius */
+      -webkit-mask-image: -webkit-radial-gradient(white, black);
+    }
+  </style>
+</head>
+
+<body
+  class="min-h-screen bg-slate-950 text-slate-200 font-sans relative flex flex-col items-center justify-center p-4 sm:p-8 m-0">
+
+  <!-- Starry Background -->
+  <div id="stars-container" class="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+    <!-- Stars injected via JS -->
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(30,41,59,0)_0%,rgba(2,6,23,0.8)_100%)]">
+    </div>
+  </div>
+
+  <!-- Wrapper to handle overflow during mobile swipe -->
+  <div class="z-10 w-full max-w-5xl overflow-hidden lg:overflow-visible pb-2 mt-4 lg:mt-0 relative">
+
+    <!-- Swipe Container -->
+    <div id="swipe-container"
+      class="flex lg:grid lg:grid-cols-12 gap-8 items-start transition-transform duration-500 ease-out touch-pan-y cursor-grab active:cursor-grabbing lg:cursor-auto lg:active:cursor-auto"
+      style="transform: translateX(0%); width: 100%;">
+
+      <!-- Left/Top Panel: Hero Moon & Date Info -->
+      <div
+        class="w-full flex-shrink-0 lg:w-auto lg:col-span-5 flex flex-col items-center justify-center space-y-6 safari-backdrop-blur border border-slate-700/50 rounded-3xl p-8 shadow-2xl relative overflow-hidden safari-clip-fix">
+
+        <div class="text-center space-y-2 z-10 w-full">
+          <h2
+            class="text-xs uppercase tracking-widest text-slate-400 font-semibold flex items-center justify-center gap-2 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+              <path d="M19 3v4" />
+              <path d="M21 5h-4" />
+            </svg>
+            Selected Date
+          </h2>
+          <div class="flex flex-col items-center justify-center">
+            <span id="hero-ogham-day" class="font-serif italic text-4xl text-white mb-1 drop-shadow-md">
+              Beth 14
+            </span>
+            <span id="hero-eng-moon" class="text-sm text-slate-400 tracking-widest uppercase font-medium">
+              (Birch Moon)
+            </span>
+          </div>
+          <div id="hero-year" class="text-lg text-blue-200/70 mt-2">
+            2026
+          </div>
+          <div id="hero-gregorian-date" class="text-xs text-slate-500 mt-1 font-medium tracking-wide">
+            Gregorian: Jan 14, 2026
+          </div>
+        </div>
+
+        <div class="relative py-8 flex justify-center items-end h-72 w-full flex-shrink-0">
+          <div class="absolute inset-0 bg-blue-500/5 blur-3xl rounded-full"></div>
+
+          <!-- Large Moon Phase -->
+          <div id="hero-moon-container" class="absolute top-4 left-1/2 -translate-x-1/2"></div>
+          <!-- Tree Silhouette Overlaid -->
+          <div id="hero-tree-container" class="absolute inset-0 pointer-events-none"></div>
+        </div>
+
+        <div class="text-center z-10 pt-4 w-full">
+          <h3 id="hero-phase-name" class="text-xl font-medium text-slate-100 tracking-wide">
+            Full Moon
+          </h3>
+          <p id="hero-phase-desc" class="text-sm text-slate-400 mt-2 max-w-[240px] leading-relaxed mx-auto">
+            Day 14 of the 28-day lunar cycle. The tree of Beth watches over the phase.
+          </p>
+        </div>
+
+        <!-- Events Section -->
+        <div class="w-full mt-4 border-t border-slate-700/50 pt-6 z-10 flex flex-col h-full">
+          <div class="flex justify-between items-center mb-4">
+            <h4 class="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              Global Events
+              <span id="loading-events"
+                class="inline-block w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin hidden"></span>
+            </h4>
+            <button onclick="openAddEventModal()"
+              class="hidden-until-admin text-xs bg-blue-600/20 border border-blue-500/50 hover:bg-blue-600/40 text-blue-300 px-3 py-1.5 rounded-full transition-colors items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14" />
+                <path d="M12 5v14" />
+              </svg>
+              Add
+            </button>
+          </div>
+          <div id="events-list" class="space-y-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar text-left w-full">
+            <!-- Events injected here -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right/Bottom Panel: The Calendar -->
+      <div id="calendar-panel"
+        class="w-full flex-shrink-0 lg:w-auto lg:col-span-7 safari-backdrop-blur border border-slate-700/50 rounded-3xl shadow-2xl overflow-hidden flex flex-col safari-clip-fix">
+
+        <!-- Calendar Header -->
+        <div class="flex items-center justify-between p-6 border-b border-slate-700/50 bg-slate-800/40">
+          <button id="btn-prev-month"
+            class="p-2 rounded-full hover:bg-slate-700/50 transition-colors text-slate-400 hover:text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+
+          <div class="flex flex-col items-center relative group cursor-pointer" onclick="openGCalModal()"
+            title="Sync Google Calendar">
+            <h1 id="cal-month-ogham"
+              class="text-2xl sm:text-3xl font-medium text-white tracking-wide font-serif italic flex items-baseline">
+              Beth <span class="text-lg not-italic font-sans text-slate-400 font-light ml-2">(Birch)</span>
+            </h1>
+            <div class="flex items-center gap-2 mt-1">
+              <span id="cal-year" class="text-sm text-slate-400 tracking-widest uppercase">
+                2026
+              </span>
+              <span id="sync-status-icon" class="text-slate-600 group-hover:text-blue-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                  <path d="M16 21v-5h5" />
+                </svg>
+              </span>
+            </div>
+          </div>
+
+          <button id="btn-next-month"
+            class="p-2 rounded-full hover:bg-slate-700/50 transition-colors text-slate-400 hover:text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="p-6 relative">
+          <!-- Faint watermark moon -->
+          <div id="watermark-moon"
+            class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5"></div>
+
+          <div id="calendar-grid" class="grid grid-cols-7 gap-2 sm:gap-4 relative z-10 w-full">
+            <!-- Days header and grid injected via JS -->
+          </div>
+        </div>
+
+        <div
+          class="bg-slate-950/50 p-4 flex justify-between items-center text-xs text-slate-500 border-t border-slate-800/50 mt-auto">
+          <span>A 13-month Celtic Tree Calendar aligned with the lunar cycle.</span>
+          <button onclick="openAdminModal()" class="hover:text-slate-300 transition-colors flex items-center gap-1"
+            title="Admin Access">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span id="admin-status-text">Viewer</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mobile Navigation Dots -->
+  <div class="flex justify-center gap-4 mt-4 lg:hidden z-10 w-full mb-4">
+    <button id="nav-hero" class="w-2.5 h-2.5 rounded-full bg-blue-500 transition-colors"
+      aria-label="Selected Date View"></button>
+    <button id="nav-cal" class="w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"
+      aria-label="Calendar View"></button>
+  </div>
+
+  <!-- Add Event Modal -->
+  <div id="modal-add-event"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div
+      class="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl w-11/12 max-w-sm transform scale-95 transition-transform duration-300"
+      id="modal-add-event-content">
+      <h3 class="text-lg font-medium text-white mb-4">Add Global Event to <span id="modal-event-date-label"
+          class="text-blue-400"></span></h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Event Title</label>
+          <input type="text" id="event-title"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500 transition-colors"
+            placeholder="e.g. Community Moon Ritual">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Time (Optional)</label>
+          <input type="time" id="event-time"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500 transition-colors">
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <button onclick="closeModals()"
+          class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Cancel</button>
+        <button onclick="saveEvent()"
+          class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg shadow-blue-500/20">Save
+          Global Event</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Login Modal -->
+  <div id="modal-admin"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div
+      class="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl w-11/12 max-w-sm transform scale-95 transition-transform duration-300"
+      id="modal-admin-content">
+      <h3 class="text-lg font-medium text-white mb-2">Admin Access</h3>
+      <p class="text-xs text-slate-400 mb-4">Enter passcode to manage community events. (Hint: druid rules)</p>
+      <div class="space-y-4">
+        <div>
+          <input type="password" id="admin-passcode"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500 transition-colors"
+            placeholder="Passcode">
+          <p id="admin-error" class="text-xs text-red-400 mt-2 hidden">Incorrect passcode.</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <button onclick="closeModals()"
+          class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Cancel</button>
+        <button onclick="verifyAdmin()"
+          class="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Calendar Sync Modal -->
+  <div id="modal-gcal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div
+      class="bg-slate-900 border border-slate-700 p-6 rounded-2xl shadow-2xl w-11/12 max-w-md transform scale-95 transition-transform duration-300"
+      id="modal-gcal-content">
+      <div class="flex items-center gap-3 mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <h3 class="text-lg font-medium text-white">Sync to Personal Calendar</h3>
+      </div>
+      <p class="text-sm text-slate-400 mb-4 leading-relaxed">
+        To sync these global events to your personal schedule, enter your Google OAuth Client ID. Events will be
+        automatically saved to a dedicated <strong>"moontree"</strong> calendar in your account.
+      </p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Google Client ID</label>
+          <input type="text" id="gcal-client-id"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500 transition-colors font-mono text-sm"
+            placeholder="XXXX-XXXX.apps.googleusercontent.com">
+          <p id="gcal-error" class="text-xs text-red-400 mt-2 hidden"></p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <button onclick="closeModals()"
+          class="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">Close</button>
+        <button onclick="initGoogleAuth()"
+          class="px-4 py-2 text-sm bg-white text-slate-900 hover:bg-slate-200 font-medium rounded-lg transition-colors flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+          </svg>
+          Authorize Google
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Constants
+    const CELTIC_MONTHS = [
+      { eng: 'Birch', ogham: 'Beth', color: '#e2e8f0' },
+      { eng: 'Rowan', ogham: 'Luis', color: '#ef4444' },
+      { eng: 'Ash', ogham: 'Nion', color: '#93c5fd' },
+      { eng: 'Alder', ogham: 'Fearn', color: '#f97316' },
+      { eng: 'Willow', ogham: 'Saille', color: '#86efac' },
+      { eng: 'Hawthorn', ogham: 'Huath', color: '#f472b6' },
+      { eng: 'Oak', ogham: 'Duir', color: '#fbbf24' },
+      { eng: 'Holly', ogham: 'Tinne', color: '#dc2626' },
+      { eng: 'Hazel', ogham: 'Coll', color: '#d97706' },
+      { eng: 'Vine', ogham: 'Muin', color: '#a855f7' },
+      { eng: 'Ivy', ogham: 'Gort', color: '#16a34a' },
+      { eng: 'Reed', ogham: 'Ngetal', color: '#9ca3af' },
+      { eng: 'Elder', ogham: 'Ruis', color: '#1d4ed8' }
+    ];
+
+    const DAYS_OF_WEEK = ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
+
+    // State variables
+    let currentYear;
+    let currentMonthIndex;
+    let selectedDay;
+    let currentView = 0;
+    let isAdmin = false;
+    let eventsByDate = {};
+    let db, auth, currentUser, appId;
+    let useFirebase = typeof __firebase_config !== 'undefined';
+    let tokenClient;
+    let gapiAccessToken = null;
+    let moontreeCalendarId = null;
+
+    // --- 1. CORE DATE LOGIC (Must run first!) ---
+    function initToday() {
+      const now = new Date();
+      const isBeforeNewCycle = (now.getMonth() < 11) || (now.getMonth() === 11 && now.getDate() < 26);
+      const cycleStartYear = isBeforeNewCycle ? now.getFullYear() - 1 : now.getFullYear();
+
+      currentYear = isBeforeNewCycle ? now.getFullYear() : now.getFullYear() + 1;
+      const cycleStart = new Date(Date.UTC(cycleStartYear, 11, 26));
+      const currentUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+      const diffMs = currentUTC - cycleStart;
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      let mIndex = Math.floor(diffDays / 28);
+      let dIndex = (diffDays % 28) + 1;
+
+      if (mIndex > 12) { mIndex = 12; dIndex = 28; }
+
+      currentMonthIndex = mIndex;
+      selectedDay = dIndex;
+    }
+
+    function getGregorianDateString(monthIdx, day, year) {
+      const cycleStart = new Date(Date.UTC(year - 1, 11, 26));
+      const daysToAdd = (monthIdx * 28) + (day - 1);
+      const targetDate = new Date(cycleStart.getTime() + (daysToAdd * 24 * 60 * 60 * 1000));
+      return targetDate.toISOString().split('T')[0];
+    }
+
+    function getGregorianDisplayDate(monthIdx, day, year) {
+      const dateStr = getGregorianDateString(monthIdx, day, year);
+      const [y, m, d] = dateStr.split('-');
+      const correctedD = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+      return correctedD.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    // CRITICAL FIX: Ensure dates are calculated before UI updates or data loading
+    initToday();
+
+    // --- 2. DATA & FIREBASE INITIALIZATION ---
+    if (useFirebase) {
+      const firebaseConfig = JSON.parse(__firebase_config);
+      const app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+      appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+      const initAuth = async () => {
+        try {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
+          }
+        } catch (e) {
+          console.error("Firebase auth failed", e);
+          useFirebase = false;
+          loadLocalEvents();
+        }
+      };
+
+      onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        if (user) setupFirestoreListener();
+      });
+      initAuth();
+    } else {
+      loadLocalEvents();
+    }
+
+    function loadLocalEvents() {
+      eventsByDate = JSON.parse(localStorage.getItem('celticEventsFallback') || '{}');
+      updateUI();
+    }
+
+    function setupFirestoreListener() {
+      if (!currentUser) return;
+      document.getElementById('loading-events').classList.remove('hidden');
+
+      const eventsRef = collection(db, 'artifacts', appId, 'public', 'data', 'celticevents');
+      onSnapshot(eventsRef, (snapshot) => {
+        eventsByDate = {};
+        snapshot.forEach(docSnap => {
+          const ev = { id: docSnap.id, ...docSnap.data() };
+          if (!eventsByDate[ev.dateStr]) eventsByDate[ev.dateStr] = [];
+          eventsByDate[ev.dateStr].push(ev);
+        });
+        document.getElementById('loading-events').classList.add('hidden');
+        updateUI();
+      }, (error) => {
+        console.error("Firestore listen error:", error);
+        document.getElementById('loading-events').classList.add('hidden');
+      });
+    }
+
+    // --- 3. UI RENDERING & HELPERS ---
+    function getPhaseName(day) {
+      if (day === 28) return "New Moon";
+      if (day < 7) return "Waxing Crescent";
+      if (day === 7) return "First Quarter";
+      if (day < 14) return "Waxing Gibbous";
+      if (day === 14) return "Full Moon";
+      if (day < 21) return "Waning Gibbous";
+      if (day === 21) return "Last Quarter";
+      if (day < 28) return "Waning Crescent";
+      return "Unknown Phase";
+    }
+
+    function getMoonPhaseSVG(day, size, useGlow = false, additionalClasses = "", idPrefix = "moon") {
+      const phase = (day % 28) / 28;
+      const isWaxing = phase <= 0.5;
+      const progress = isWaxing ? (phase / 0.5) : ((phase - 0.5) / 0.5);
+
+      const darkColor = "#0f172a";
+      const lightColor = "#f8fafc";
+      const glowStyle = useGlow ? 'filter: drop-shadow(0px 0px 12px rgba(255,255,255,0.3));' : '';
+      const clipId = `${idPrefix}-clip-${day}-${size}-${Math.random().toString(36).substr(2, 9)}`;
+
+      let litParts = '';
+      if (isWaxing) {
+        litParts += `<rect x="12" y="0" width="12" height="24" fill="${lightColor}" />`;
+        if (progress < 0.5) {
+          litParts += `<ellipse cx="12" cy="12" rx="${11 * (1 - progress * 2)}" ry="11" fill="${darkColor}" />`;
+        } else {
+          litParts += `<ellipse cx="12" cy="12" rx="${11 * ((progress - 0.5) * 2)}" ry="11" fill="${lightColor}" />`;
+        }
+      } else {
+        litParts += `<rect x="0" y="0" width="12" height="24" fill="${lightColor}" />`;
+        if (progress < 0.5) {
+          litParts += `<ellipse cx="12" cy="12" rx="${11 * (1 - progress * 2)}" ry="11" fill="${lightColor}" />`;
+        } else {
+          litParts += `<ellipse cx="12" cy="12" rx="${11 * ((progress - 0.5) * 2)}" ry="11" fill="${darkColor}" />`;
+        }
+      }
+
+      return `
+        <svg width="${size}" height="${size}" viewBox="0 0 24 24" class="flex-shrink-0 ${additionalClasses}" style="${glowStyle}" xmlns="http://www.w3.org/2000/svg">
+          <defs><clipPath id="${clipId}"><circle cx="12" cy="12" r="11" /></clipPath></defs>
+          <circle cx="12" cy="12" r="11" fill="${darkColor}" />
+          <g clip-path="url(#${clipId})">${litParts}</g>
+          <circle cx="12" cy="12" r="11" fill="none" stroke="#334155" stroke-width="0.5" />
+        </svg>
+      `;
+    }
+
+    function getTreeOverlaySVG(color) {
+      return `
+        <svg viewBox="0 0 200 200" class="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-48 sm:w-64 sm:h-64 pointer-events-none drop-shadow-[0_10px_15px_rgba(0,0,0,0.8)] z-20 transition-all duration-700 ease-in-out flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="100" cy="85" r="55" fill="${color}" opacity="0.15" filter="blur(20px)" class="transition-all duration-700" style="transition: fill 0.7s ease;" />
+          <g fill="${color}" opacity="0.85" class="transition-all duration-700" style="transition: fill 0.7s ease;">
+            <circle cx="100" cy="65" r="40" />
+            <circle cx="60" cy="95" r="32" />
+            <circle cx="140" cy="95" r="32" />
+            <circle cx="80" cy="125" r="24" />
+            <circle cx="120" cy="125" r="24" />
+            <circle cx="100" cy="35" r="28" />
+            <circle cx="45" cy="120" r="15" opacity="0.6"/>
+            <circle cx="155" cy="120" r="15" opacity="0.6"/>
+          </g>
+          <path d="M92,200 Q95,140 100,110 Q105,140 108,200 Z" fill="#020617" />
+          <path d="M100,125 Q75,115 50,95" stroke="#020617" stroke-width="5" stroke-linecap="round" fill="none" />
+          <path d="M100,125 Q125,115 150,95" stroke="#020617" stroke-width="5" stroke-linecap="round" fill="none" />
+          <path d="M100,115 Q80,85 70,65" stroke="#020617" stroke-width="4" stroke-linecap="round" fill="none" />
+          <path d="M100,115 Q120,85 130,65" stroke="#020617" stroke-width="4" stroke-linecap="round" fill="none" />
+          <path d="M100,110 Q100,75 100,45" stroke="#020617" stroke-width="4" stroke-linecap="round" fill="none" />
+        </svg>
+      `;
+    }
+
+    function generateStars() {
+      const container = document.getElementById('stars-container');
+      const gradient = container.innerHTML;
+      let starsHTML = '';
+      const isMobile = window.innerWidth < 768;
+      const numStars = isMobile ? 50 : 150;
+
+      for (let i = 0; i < numStars; i++) {
+        const left = `${Math.random() * 100}%`;
+        const top = `${Math.random() * 100}%`;
+        const size = `${Math.random() * 2 + 0.5}px`;
+        const opacity = Math.random() * 0.8 + 0.2;
+        const delay = `${Math.random() * 4}s`;
+        const duration = `${Math.random() * 3 + 2}s`;
+        starsHTML += `<div class="absolute rounded-full bg-white animate-[pulse-slow_infinite]" style="left: ${left}; top: ${top}; width: ${size}; height: ${size}; opacity: ${opacity}; animation-delay: ${delay}; animation-duration: ${duration};"></div>`;
+      }
+      container.innerHTML = starsHTML + gradient;
+    }
+
+    function updateUI() {
+      if (currentMonthIndex === undefined) return; // Failsafe
+
+      const month = CELTIC_MONTHS[currentMonthIndex];
+      const gregorianDisplay = getGregorianDisplayDate(currentMonthIndex, selectedDay, currentYear);
+
+      document.getElementById('hero-ogham-day').textContent = `${month.ogham} ${selectedDay}`;
+      document.getElementById('hero-eng-moon').textContent = `(${month.eng} Moon)`;
+      document.getElementById('hero-year').textContent = currentYear;
+      document.getElementById('hero-gregorian-date').textContent = `Gregorian: ${gregorianDisplay}`;
+      document.getElementById('hero-phase-name').textContent = getPhaseName(selectedDay);
+      document.getElementById('hero-phase-desc').textContent = `Day ${selectedDay} of the lunar cycle. The tree of ${month.ogham} watches over this phase.`;
+
+      const isMobile = window.innerWidth < 768;
+      const heroMoonSize = isMobile ? 140 : 200;
+
+      document.getElementById('hero-moon-container').innerHTML = getMoonPhaseSVG(selectedDay, heroMoonSize, true, "transition-all duration-500 ease-in-out", "hero");
+      document.getElementById('hero-tree-container').innerHTML = getTreeOverlaySVG(month.color);
+
+      document.getElementById('cal-month-ogham').innerHTML = `${month.ogham} <span class="text-lg not-italic font-sans text-slate-400 font-light ml-2">(${month.eng})</span>`;
+      document.getElementById('cal-year').textContent = currentYear;
+
+      if (isAdmin) {
+        document.body.classList.add('admin-mode');
+        document.getElementById('admin-status-text').textContent = 'Admin Mode';
+        document.getElementById('admin-status-text').classList.add('text-blue-400');
+      } else {
+        document.body.classList.remove('admin-mode');
+        document.getElementById('admin-status-text').textContent = 'Viewer';
+        document.getElementById('admin-status-text').classList.remove('text-blue-400');
+      }
+
+      renderGrid();
+      renderEvents();
+    }
+
+    function renderEvents() {
+      const listContainer = document.getElementById('events-list');
+      const dateStr = getGregorianDateString(currentMonthIndex, selectedDay, currentYear);
+      const dayEvents = eventsByDate[dateStr] || [];
+
+      if (dayEvents.length === 0) {
+        listContainer.innerHTML = `<div class="text-xs text-slate-500 italic text-center py-4">No community events scheduled.</div>`;
+        return;
+      }
+
+      listContainer.innerHTML = dayEvents.map(ev => `
+        <div class="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 flex justify-between items-center group hover:bg-slate-800 transition-colors">
+          <div>
+            <div class="text-sm font-medium text-white">${ev.title}</div>
+            ${ev.time ? `<div class="text-xs text-blue-400 mt-1 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ${ev.time}</div>` : ''}
+          </div>
+          <button onclick="deleteEvent('${ev.id}')" class="hidden-until-admin text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('calendar-grid');
+      const month = CELTIC_MONTHS[currentMonthIndex];
+      let gridHTML = '';
+
+      DAYS_OF_WEEK.forEach(day => {
+        gridHTML += `<div class="text-center text-xs font-semibold uppercase tracking-wider text-slate-500 pb-2">${day}</div>`;
+      });
+
+      for (let day = 1; day <= 28; day++) {
+        const isSelected = selectedDay === day;
+        const dateStr = getGregorianDateString(currentMonthIndex, day, currentYear);
+        const hasEvents = eventsByDate[dateStr] && eventsByDate[dateStr].length > 0;
+
+        const baseClasses = "relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl transition-all duration-300 group outline-none focus:ring-2 focus:ring-blue-500/50 active:scale-95";
+        const stateClasses = isSelected
+          ? "bg-blue-600/20 border border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+          : "bg-slate-800/30 border border-slate-700/30 hover:bg-slate-700/50 hover:border-slate-500/50 cursor-pointer";
+        const textClasses = isSelected ? "text-white" : "text-slate-300";
+        const moonClasses = `transition-transform duration-300 ${isSelected ? 'scale-110' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'}`;
+
+        const eventDot = hasEvents
+          ? `<div class="absolute bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full shadow-[0_0_5px_rgba(96,165,250,0.8)]"></div>`
+          : '';
+
+        gridHTML += `
+          <button onclick="selectDay(${day})" class="${baseClasses} ${stateClasses}" title="${month.ogham} (${month.eng}) ${day} - ${getPhaseName(day)}">
+            <span class="text-sm sm:text-base mb-2 font-medium ${textClasses}">${day}</span>
+            ${getMoonPhaseSVG(day, 24, false, moonClasses, `grid-${day}`)}
+            ${eventDot}
+          </button>
+        `;
+      }
+      grid.innerHTML = gridHTML;
+    }
+
+    function updateMobileView() {
+      const swipeContainer = document.getElementById('swipe-container');
+      const navHero = document.getElementById('nav-hero');
+      const navCal = document.getElementById('nav-cal');
+
+      if (window.innerWidth < 1024) {
+        const gapOffset = 32;
+        if (currentView === 0) {
+          swipeContainer.style.transform = `translateX(0px)`;
+          navHero.classList.replace('bg-slate-600', 'bg-blue-500');
+          navCal.classList.replace('bg-blue-500', 'bg-slate-600');
+        } else {
+          swipeContainer.style.transform = `translateX(calc(-100% - ${gapOffset}px))`;
+          navHero.classList.replace('bg-blue-500', 'bg-slate-600');
+          navCal.classList.replace('bg-slate-600', 'bg-blue-500');
+        }
+      } else {
+        swipeContainer.style.transform = 'none';
+      }
+    }
+
+    // --- 4. MODALS & INTERACTIONS ---
+    window.openAddEventModal = () => {
+      if (!isAdmin) return;
+      const month = CELTIC_MONTHS[currentMonthIndex];
+      document.getElementById('modal-event-date-label').textContent = `${month.ogham} ${selectedDay}`;
+
+      const titleInput = document.getElementById('event-title');
+      titleInput.value = '';
+      titleInput.classList.remove('border-red-500');
+      document.getElementById('event-time').value = '';
+
+      const modal = document.getElementById('modal-add-event');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('modal-add-event-content').classList.replace('scale-95', 'scale-100');
+    };
+
+    window.openGCalModal = () => {
+      document.getElementById('gcal-error').classList.add('hidden');
+      const modal = document.getElementById('modal-gcal');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('modal-gcal-content').classList.replace('scale-95', 'scale-100');
+    };
+
+    window.openAdminModal = () => {
+      if (isAdmin) {
+        isAdmin = false;
+        updateUI();
+        return;
+      }
+      document.getElementById('admin-passcode').value = '';
+      document.getElementById('admin-error').classList.add('hidden');
+      const modal = document.getElementById('modal-admin');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('modal-admin-content').classList.replace('scale-95', 'scale-100');
+    };
+
+    window.closeModals = () => {
+      ['modal-add-event', 'modal-gcal', 'modal-admin'].forEach(id => {
+        const modal = document.getElementById(id);
+        const content = document.getElementById(id + '-content');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        content.classList.replace('scale-100', 'scale-95');
+      });
+    };
+
+    window.verifyAdmin = () => {
+      const pass = document.getElementById('admin-passcode').value;
+      if (pass.toLowerCase() === 'dru1d2026') {
+        isAdmin = true;
+        window.closeModals();
+        updateUI();
+      } else {
+        document.getElementById('admin-error').classList.remove('hidden');
+      }
+    };
+
+    window.saveEvent = async () => {
+      if (!isAdmin) return;
+      const titleInput = document.getElementById('event-title');
+      const title = titleInput.value.trim();
+      const time = document.getElementById('event-time').value;
+
+      if (!title) {
+        titleInput.classList.add('border-red-500');
+        return;
+      }
+
+      const dateStr = getGregorianDateString(currentMonthIndex, selectedDay, currentYear);
+      const eventData = { title, time, dateStr, timestamp: Date.now() };
+
+      if (useFirebase && currentUser) {
+        try {
+          const newDocRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'celticevents'));
+          await setDoc(newDocRef, eventData);
+        } catch (e) { console.error("Error saving global event", e); }
+      } else {
+        if (!eventsByDate[dateStr]) eventsByDate[dateStr] = [];
+        eventsByDate[dateStr].push({ id: Date.now().toString(), ...eventData });
+        localStorage.setItem('celticEventsFallback', JSON.stringify(eventsByDate));
+        updateUI();
+      }
+
+      if (gapiAccessToken) {
+        await pushEventToGoogle(eventData, dateStr);
+      }
+
+      window.closeModals();
+    };
+
+    window.deleteEvent = async (id) => {
+      if (!isAdmin) return;
+      if (useFirebase && currentUser) {
+        try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'celticevents', id));
+        } catch (e) { console.error("Error deleting event", e); }
+      } else {
+        const dateStr = getGregorianDateString(currentMonthIndex, selectedDay, currentYear);
+        if (eventsByDate[dateStr]) {
+          eventsByDate[dateStr] = eventsByDate[dateStr].filter(e => e.id !== id);
+          localStorage.setItem('celticEventsFallback', JSON.stringify(eventsByDate));
+          updateUI();
+        }
+      }
+    };
+
+    window.selectDay = (day) => {
+      selectedDay = day;
+      updateUI();
+      if (window.innerWidth < 1024) {
+        currentView = 0;
+        updateMobileView();
+      }
+    };
+
+    // Google Auth Sync Functions
+    window.initGoogleAuth = () => {
+      const clientId = document.getElementById('gcal-client-id').value.trim();
+      const errorMsg = document.getElementById('gcal-error');
+
+      if (!clientId) {
+        errorMsg.textContent = "Please enter your Google OAuth Client ID.";
+        errorMsg.classList.remove('hidden');
+        return;
+      }
+      try {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar',
+          callback: (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              gapiAccessToken = tokenResponse.access_token;
+              document.getElementById('sync-status-icon').classList.replace('text-slate-600', 'text-green-400');
+              window.closeModals();
+              if (confirm('Successfully synced with Google Calendar! Would you like to push all community events in this lunar cycle to your "moontree" calendar?')) {
+                syncMonthToGoogle();
+              }
+            }
+          },
+          error_callback: (error) => {
+            errorMsg.textContent = "Authentication failed. Ensure the Client ID is correct.";
+            errorMsg.classList.remove('hidden');
+          }
+        });
+        tokenClient.requestAccessToken();
+      } catch (e) {
+        errorMsg.textContent = "Failed to initialize Google Auth.";
+        errorMsg.classList.remove('hidden');
+      }
+    };
+
+    async function syncMonthToGoogle() {
+      if (!gapiAccessToken) return;
+      for (let day = 1; day <= 28; day++) {
+        const dateStr = getGregorianDateString(currentMonthIndex, day, currentYear);
+        if (eventsByDate[dateStr]) {
+          for (const ev of eventsByDate[dateStr]) {
+            await pushEventToGoogle(ev, dateStr);
+          }
+        }
+      }
+      alert("Events for this cycle have been pushed to your Google Calendar!");
+    }
+
+    async function getOrCreateMoontreeCalendar() {
+      if (moontreeCalendarId) return moontreeCalendarId;
+      try {
+        const listRes = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+          headers: { 'Authorization': `Bearer ${gapiAccessToken}` }
+        });
+        const listData = await listRes.json();
+        const existingCal = listData.items?.find(cal => cal.summary.toLowerCase() === 'moontree');
+        if (existingCal) return moontreeCalendarId = existingCal.id;
+
+        const createRes = await fetch('https://www.googleapis.com/calendar/v3/calendars', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${gapiAccessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summary: 'moontree' })
+        });
+        const createData = await createRes.json();
+        return moontreeCalendarId = createData.id;
+      } catch (error) {
+        console.error('Error fetching/creating calendar:', error);
+        return null;
+      }
+    }
+
+    async function pushEventToGoogle(eventObj, dateStr) {
+      const calId = await getOrCreateMoontreeCalendar();
+      if (!calId) return;
+
+      const gcalEvent = { summary: eventObj.title };
+      const [y, m, d] = dateStr.split('-');
+
+      if (eventObj.time) {
+        const [hr, min] = eventObj.time.split(':');
+        const startDateTime = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), parseInt(hr, 10), parseInt(min, 10));
+        const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000);
+        gcalEvent.start = { dateTime: startDateTime.toISOString() };
+        gcalEvent.end = { dateTime: endDateTime.toISOString() };
+      } else {
+        const nextDay = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10) + 1);
+        const nY = nextDay.getFullYear();
+        const nM = String(nextDay.getMonth() + 1).padStart(2, '0');
+        const nD = String(nextDay.getDate()).padStart(2, '0');
+
+        gcalEvent.start = { date: dateStr };
+        gcalEvent.end = { date: `${nY}-${nM}-${nD}` };
+      }
+
+      try {
+        await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${gapiAccessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(gcalEvent)
+        });
+      } catch (e) { console.error('Error syncing to Google Calendar', e); }
+    }
+
+    // --- 5. EVENT LISTENERS & FINAL LOAD ---
+    document.getElementById('btn-prev-month').addEventListener('click', () => {
+      if (currentMonthIndex === 0) { currentMonthIndex = 12; currentYear--; }
+      else { currentMonthIndex--; }
+      updateUI();
+    });
+
+    document.getElementById('btn-next-month').addEventListener('click', () => {
+      if (currentMonthIndex === 12) { currentMonthIndex = 0; currentYear++; }
+      else { currentMonthIndex++; }
+      updateUI();
+    });
+
+    const swipeContainer = document.getElementById('swipe-container');
+    let startX = 0, startY = 0, isDragging = false;
+
+    swipeContainer.addEventListener('mousedown', (e) => { if (window.innerWidth >= 1024) return; startX = e.pageX; startY = e.pageY; isDragging = true; });
+    swipeContainer.addEventListener('touchstart', (e) => { if (window.innerWidth >= 1024) return; startX = e.touches[0].clientX; startY = e.touches[0].clientY; isDragging = true; }, { passive: true });
+
+    const handleDragEnd = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      let endX, endY;
+      if (e.type.includes('mouse')) { endX = e.pageX; endY = e.pageY; }
+      else { endX = e.changedTouches[0].clientX; endY = e.changedTouches[0].clientY; }
+
+      const diffX = startX - endX;
+      const diffY = startY - endY;
+
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+        if (diffX > 0 && currentView === 0) currentView = 1;
+        else if (diffX < 0 && currentView === 1) currentView = 0;
+        updateMobileView();
+      }
+    };
+
+    window.addEventListener('mouseup', handleDragEnd);
+    swipeContainer.addEventListener('touchend', handleDragEnd);
+
+    document.getElementById('nav-hero').addEventListener('click', () => { currentView = 0; updateMobileView(); });
+    document.getElementById('nav-cal').addEventListener('click', () => { currentView = 1; updateMobileView(); });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const isMobile = window.innerWidth < 768;
+        const currentStarsCount = document.getElementById('stars-container').childElementCount - 1;
+        if ((isMobile && currentStarsCount > 50) || (!isMobile && currentStarsCount <= 50)) generateStars();
+        updateUI();
+        updateMobileView();
+      }, 250);
+    });
+
+    // Run remaining layout setup
+    generateStars();
+    document.getElementById('watermark-moon').innerHTML = getMoonPhaseSVG(14, 300, false, "", "watermark");
+    updateUI();
+    updateMobileView();
+
+  </script>
+</body>
+
+</html>
