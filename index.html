@@ -11,7 +11,19 @@
 
   <!-- Google Identity Services for Calendar Sync -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    // This tells the app exactly where your database lives
+    const __firebase_config = JSON.stringify({
+      apiKey: "AIzaSyATgJ_-3IscI9V0W62E3CgsHQXg2oclzKg",
+      authDomain: "moontree-41f57.firebaseapp.com",
+      projectId: "moontree-41f57",
+      storageBucket: "moontree-41f57.appspot.com",
+      messagingSenderId: "974411235419",
+      appId: "moontree-calendar"
+    });
 
+    const __app_id = "moontree-calendar"; // Groups your events in the database
+  </script>
   <!-- Custom CSS for Animations & Safari Fixes -->
   <style>
     html,
@@ -71,6 +83,7 @@
     .safari-clip-fix {
       /* Prevents Safari bug where overflow visible ignores border radius */
       -webkit-mask-image: -webkit-radial-gradient(white, black);
+      mask-image: radial-gradient(white, black);
     }
   </style>
 </head>
